@@ -67,7 +67,7 @@ The API expects a JSON body with a `query`.
 
 **Example with `curl`:**
 
-1.  **First question in a new session:**
+1.  **First question:**
 
     ```bash
     curl -X POST http://localhost:5000/chat \
@@ -75,9 +75,26 @@ The API expects a JSON body with a `query`.
     -d '{"query": "What is the highest mountain?"}'
     ```
 
-2.  **Follow-up question in the same session:**
+2.  **Follow-up question:**
     ```bash
     curl -X POST http://localhost:5000/chat \
+    -H "Content-Type: application/json" \
+    -d '{"query": "Where is it located?"}'
+    ```
+
+**Or through the deployed link:**
+
+1.  **First question:**
+
+    ```bash
+    curl -X POST https://my-rag-chatbot-8wk0.onrender.com/chat \
+    -H "Content-Type: application/json" \
+    -d '{"query": "What is the highest mountain?"}'
+    ```
+
+2.  **Follow-up question:**
+    ```bash
+    curl -X POST https://my-rag-chatbot-8wk0.onrender.com/chat \
     -H "Content-Type: application/json" \
     -d '{"query": "Where is it located?"}'
     ```
