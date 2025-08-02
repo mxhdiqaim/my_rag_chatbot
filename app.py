@@ -5,7 +5,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain_groq import ChatGroq # Specific for Groq with LangChain
+from langchain_groq import ChatGroq
+from flask import Flask, request, jsonify
 
 # --- Configuration ---
 load_dotenv()
@@ -15,7 +16,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY not found. Please set it in your .env file.")
 
-# --- Your Knowledge Base (Documents) ---
+# --- The Knowledge Base (Documents) ---
 documents = [
     "The capital of France is Paris. Paris is known for the Eiffel Tower.",
     "The largest ocean is the Pacific Ocean.",
@@ -28,46 +29,54 @@ documents = [
 vectorizer = TfidfVectorizer()
 doc_vectors = vectorizer.fit_transform(documents)
 
-# --- Initialize the Language Model (Groq) ---
-# This is the "AI Brain" ready to think and generate text.
-llm = ChatGroq(temperature=0.7, groq_api_key=GROQ_API_KEY, model_name="llama3-8b-8192") # I choose "llama3-8b-8192" or "mixtral-8x7b-32768"
+# --- Initialize the Language Model ---
+llm = ChatGroq(temperature=0.7, groq_api_key=GROQ_API_KEY, model_name="llama3-8b-8192")
 
-# --- Build the RAG Agent Logic ---
-# This combines the AI brain, the super library, and the memory.
-
-# Function to retrieve relevant documents based on a query
+# --- RAG Logic Functions ---
 def retrieve_documents(query, top_n=2):
     query_vector = vectorizer.transform([query])
     similarities = cosine_similarity(query_vector, doc_vectors).flatten()
-    # Get indices of top 2 most similar documents
     top_indices = similarities.argsort()[-top_n:][::-1]
     retrieved_docs = [documents[i] for i in top_indices]
-    return " ".join(retrieved_docs) # Combine them into a single string
+    return " ".join(retrieved_docs)
 
-# Set up conversation memory for the chatbot
-memory = ConversationBufferMemory()
-conversation = ConversationChain(
-    llm=llm,
-    memory=memory,
-    verbose=True
-)
+# This dictionary will store conversation memory per session/user
+session_memories = {}
 
-# --- Main Chatbot Interaction Loop ---
-print("Welcome to your custom RAG chatbot! Type 'quit' to exit.")
-while True:
-    user_query = input("\nYou: ")
-    if user_query.lower() == 'quit':
-        print("Chatbot: Goodbye!")
-        break
+def get_conversation_chain(session_id):
+    if session_id not in session_memories:
+        session_memories[session_id] = ConversationBufferMemory()
+    return ConversationChain(
+        llm=llm,
+        memory=session_memories[session_id],
+        verbose=False
+    )
 
-    # Retrieve relevant info from your documents
+# --- Flask App Setup ---
+app = Flask(__name__)
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    user_query = data.get('query')
+    session_id = data.get('session_id', 'default_session') # Use session_id for multi-user memory
+
+    if not user_query:
+        return jsonify({"error": "Query not provided"}), 400
+
+    # Retrieve relevant info
     context_info = retrieve_documents(user_query)
 
-    # Combine user query with retrieved context
-    # Integrate the context directly into the prompt for the conversation chain
-    # LangChain's ConversationChain handles the memory automatically
+    # Get conversation chain for the session
+    conversation = get_conversation_chain(session_id)
+
+    # Prepare the full prompt with context
     full_prompt = f"Using the following context, answer the user's question. If the answer is not in the context, say you don't know.\n\nContext: {context_info}\n\nUser: {user_query}"
 
-    # Get response from the AI
+    # Get response from AI
     response = conversation.predict(input=full_prompt)
-    print(f"Chatbot: {response}")
+
+    return jsonify({"response": response})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000) # Runs the web server on port 5000
