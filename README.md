@@ -1,4 +1,4 @@
-# RAG Chatbot with Swaemauri SDK, Groq, Flask, and Docker
+# RAG Chatbot with Swarmauri SDK, Groq, Flask, and Docker
 
 This project is a fully functional, containerized **Retrieval-Augmented Generation (RAG)** chatbot. It uses the high-speed Groq API for language model inference and is served via a Flask web server. It is challenge for Swarmauri Job Application.
 
